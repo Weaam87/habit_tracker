@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'habit_tracker_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,6 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
   void handleLogin() {
     if (validateForm()) {
       authenticateUser();
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HabitTrackerScreen(username: '')),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill all fields')),
