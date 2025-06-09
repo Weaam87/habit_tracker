@@ -18,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
         passwordController.text.isNotEmpty;
   }
 
-  Future<void> authenticateUser() async {
+  Future<bool> authenticateUser() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? savedEmail = prefs.getString('email');
     String? savedPassword = prefs.getString('password');
@@ -28,21 +28,28 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login Successful')),
       );
-      // Navigate to home screen later
+      return true; // ✅ return success
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Invalid credentials')),
       );
+      return false; // ❌ invalid login
     }
   }
 
-  void handleLogin() {
+  void handleLogin() async {
     if (validateForm()) {
-      authenticateUser();
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => HabitTrackerScreen(username: '')),
-      );
+      bool success = await authenticateUser(); // ✅ this now works
+      if (success) {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? username = prefs.getString('username');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HabitTrackerScreen(username: username ?? ''),
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill all fields')),
