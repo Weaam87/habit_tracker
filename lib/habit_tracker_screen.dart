@@ -18,6 +18,7 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
   @override
   void initState() {
     super.initState();
+    name = widget.username;
   }
 
   Future<void> _saveHabits() async {
