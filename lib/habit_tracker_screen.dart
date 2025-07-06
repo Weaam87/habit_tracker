@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'add_habit_screen.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HabitTrackerScreen extends StatefulWidget {
   final String username;
@@ -18,11 +20,30 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    name = widget.username;
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? savedName = prefs.getString('name');
+    String? habitsStr = prefs.getString('habits');
+    String? completedStr = prefs.getString('completedHabits');
+    setState(() {
+      name = savedName ?? widget.username;
+      if (habitsStr != null) {
+        selectedHabitsMap = Map<String, String>.from(jsonDecode(habitsStr));
+      }
+      if (completedStr != null) {
+        completedHabitsMap =
+            Map<String, String>.from(jsonDecode(completedStr));
+      }
+    });
   }
 
   Future<void> _saveHabits() async {
-    //save habits to preferences in the future
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('habits', jsonEncode(selectedHabitsMap));
+    await prefs.setString('completedHabits', jsonEncode(completedHabitsMap));
   }
 
   Color _getColorFromHex(String hexColor) {
@@ -182,13 +203,14 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
       ),
       floatingActionButton: selectedHabitsMap.isEmpty
           ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => AddHabitScreen(),
                   ),
                 );
+                _loadUser();
               },
               child: Icon(Icons.add),
               backgroundColor: Colors.blue.shade700,

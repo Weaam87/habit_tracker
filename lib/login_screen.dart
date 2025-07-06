@@ -13,6 +13,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _setupFakeUser();
+  }
+
+  Future<void> _setupFakeUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('email')) {
+      await prefs.setString('username', 'demo');
+      await prefs.setString('name', 'Demo User');
+      await prefs.setString('email', 'demo@example.com');
+      await prefs.setString('password', 'password');
+    }
+  }
+
   bool validateForm() {
     return emailController.text.isNotEmpty &&
         passwordController.text.isNotEmpty;
@@ -39,14 +55,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void handleLogin() async {
     if (validateForm()) {
-      bool success = await authenticateUser(); // ✅ this now works
+      bool success = await authenticateUser();
       if (success) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
-        String? username = prefs.getString('username');
+        String? name = prefs.getString('name');
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => HabitTrackerScreen(username: username ?? ''),
+            builder: (context) => HabitTrackerScreen(username: name ?? ''),
           ),
         );
       }
