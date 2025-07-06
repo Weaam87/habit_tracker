@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddHabitScreen extends StatefulWidget {
   const AddHabitScreen({super.key});
@@ -31,21 +33,26 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   }
 
   Future<void> _loadHabits() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? habitsStr = prefs.getString('habits');
+    String? completedStr = prefs.getString('completedHabits');
+
     setState(() {
-      // Hardcoded habits for demonstration
-      selectedHabitsMap = {
-        'Workout': 'FF5733', // Color in hex (e.g., Amber)
-        'Meditate': 'FF33A1',
-        'Read a Book': '33FFA1',
-        'Drink Water': '3380FF',
-        'Practice Gratitude': 'FFC300'
-      };
-      completedHabitsMap = {'Wake Up Early': 'FF5733', 'Journal': 'DAF7A6'};
+      if (habitsStr != null) {
+        selectedHabitsMap =
+            Map<String, String>.from(jsonDecode(habitsStr));
+      }
+      if (completedStr != null) {
+        completedHabitsMap =
+            Map<String, String>.from(jsonDecode(completedStr));
+      }
     });
   }
 
   Future<void> _saveHabits() async {
-    // This function intentionally left empty as no saving is needed
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('habits', jsonEncode(selectedHabitsMap));
+    await prefs.setString('completedHabits', jsonEncode(completedHabitsMap));
   }
 
   @override
@@ -120,13 +127,13 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               onPressed: () {
                 if (_habitController.text.isNotEmpty) {
                   setState(() {
-                    // Add the new habit to the selectedHabitsMap with the chosen color
                     selectedHabitsMap[_habitController.text] =
                         selectedColor.value.toRadixString(16);
                     _habitController.clear();
-                    selectedColorName = 'Amber'; // Reset to default
+                    selectedColorName = 'Amber';
                     selectedColor = _habitColors[selectedColorName]!;
                   });
+                  _saveHabits();
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -157,10 +164,10 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                       icon: Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
                         setState(() {
-                          // Remove habit from both maps if it exists
                           selectedHabitsMap.remove(habitName);
                           completedHabitsMap.remove(habitName);
                         });
+                        _saveHabits();
                       },
                     ),
                   );
