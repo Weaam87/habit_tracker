@@ -17,7 +17,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-  String selectedCountry = countryList.first;
+  List<String> countryList = [];
+  String selectedCountry = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    final countries = await getCountries();
+    setState(() {
+      countryList = countries;
+      selectedCountry = countries.isNotEmpty ? countries.first : '';
+    });
+  }
 
   final Map<String, bool> _habitToggles = {
     'Exercise': false,
@@ -83,18 +98,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: InputDecoration(labelText: 'Age'),
                 keyboardType: TextInputType.number,
               ),
-              DropdownButtonFormField<String>(
-                value: selectedCountry,
-                decoration: InputDecoration(labelText: 'Country'),
-                items: countryList
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (val) {
-                  setState(() {
-                    selectedCountry = val!;
-                  });
-                },
-              ),
+              countryList.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : DropdownButtonFormField<String>(
+                      value: selectedCountry,
+                      decoration:
+                          const InputDecoration(labelText: 'Country'),
+                      isExpanded: true,
+                      items: countryList
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          selectedCountry = val ?? '';
+                        });
+                      },
+                    ),
               TextField(
                 controller: emailController,
                 decoration: InputDecoration(labelText: 'Email'),
