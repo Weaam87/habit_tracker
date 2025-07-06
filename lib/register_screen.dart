@@ -99,11 +99,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.number,
               ),
               countryList.isEmpty
-                  ? const CircularProgressIndicator()
+                  ? const Center(child: CircularProgressIndicator())
                   : DropdownButtonFormField<String>(
                       value: selectedCountry,
                       decoration:
                           const InputDecoration(labelText: 'Country'),
+                      isExpanded: true,
                       items: countryList
                           .map((c) => DropdownMenuItem(
                                 value: c,
