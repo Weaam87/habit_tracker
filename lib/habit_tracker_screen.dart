@@ -16,6 +16,7 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
   Map<String, String> selectedHabitsMap = {};
   Map<String, String> completedHabitsMap = {};
   String name = '';
+  String email = '';
 
   @override
   void initState() {
@@ -26,10 +27,12 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
   Future<void> _loadUser() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? savedName = prefs.getString('name');
+    String? savedEmail = prefs.getString('email');
     String? habitsStr = prefs.getString('habits');
     String? completedStr = prefs.getString('completedHabits');
     setState(() {
       name = savedName ?? widget.username;
+      email = savedEmail ?? '';
       if (habitsStr != null) {
         selectedHabitsMap = Map<String, String>.from(jsonDecode(habitsStr));
       }
@@ -81,6 +84,7 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
         ),
         automaticallyImplyLeading: true,
       ),
+      drawer: _buildDrawer(context),
       body: Column(
         children: [
           const Padding(
@@ -242,5 +246,79 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            decoration: BoxDecoration(color: Colors.blue.shade700),
+            accountName: Text(name),
+            accountEmail: Text(email),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                name.isNotEmpty ? name[0] : '',
+                style: const TextStyle(fontSize: 24, color: Colors.black),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Configure'),
+            onTap: () async {
+              Navigator.pop(context);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddHabitScreen()),
+              );
+              _loadUser();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.person),
+            title: const Text('Personal Info'),
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Personal Info clicked')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.pie_chart),
+            title: const Text('Reports'),
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Reports clicked')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications),
+            title: const Text('Notifications'),
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications clicked')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign Out'),
+            onTap: () => _signOut(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _signOut(BuildContext context) {
+    Navigator.pop(context);
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 }
