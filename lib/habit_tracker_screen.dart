@@ -328,6 +328,9 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
   }
 
   void _signOut(BuildContext context) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('logged_in', false);
+    });
     Navigator.pop(context);
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }

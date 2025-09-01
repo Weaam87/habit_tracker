@@ -22,15 +22,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Map<String, String> _habitsMap = {};
   Set<String> _selectedTasks = {};
   TimeOfDay? _selectedTime;
+  bool _settingsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeNotifications();
+    _setup();
     _loadHabits();
   }
 
-  Future<void> _initializeNotifications() async {
+  Future<void> _setup() async {
+    await _loadSettings();
+    await _initNotifications();
+    await _updateScheduledNotifications();
+    setState(() {
+      _settingsLoaded = true;
+    });
+  }
+
+  Future<void> _initNotifications() async {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
@@ -41,13 +51,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
 
     tz.initializeTimeZones();
     final timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timeZoneName));
-
-    await _loadSettings();
-    await _updateScheduledNotifications();
   }
 
   Future<void> _loadHabits() async {
@@ -117,6 +125,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _saveSettings();
+    super.dispose();
+  }
+
   tz.TZDateTime _nextInstanceOfTime(TimeOfDay time) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
@@ -163,6 +177,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_settingsLoaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
