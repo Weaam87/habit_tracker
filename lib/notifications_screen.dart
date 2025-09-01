@@ -106,20 +106,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     const androidDetails = AndroidNotificationDetails(
       'habit_channel',
       'Habit Reminders',
+      channelDescription: 'Daily habit reminder notifications',
       importance: Importance.max,
       priority: Priority.high,
     );
     const details = NotificationDetails(android: androidDetails);
     final schedule = _nextInstanceOfTime(_selectedTime!);
 
+    var id = 0;
     for (final habit in _selectedTasks) {
       await _flutterLocalNotificationsPlugin.zonedSchedule(
-        habit.hashCode,
+        id++,
         'Reminder',
         'Time to work on $habit',
         schedule,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
       );
     }
