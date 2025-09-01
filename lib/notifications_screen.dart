@@ -2,7 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -31,6 +34,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: androidSettings);
     await _flutterLocalNotificationsPlugin.initialize(settings);
+
+    final androidPlugin = _flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestPermission();
+
+    tz.initializeTimeZones();
+    final timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+
+    await _loadSettings();
+    await _updateScheduledNotifications();
   }
 
   Future<void> _loadHabits() async {
@@ -41,6 +56,75 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _habitsMap = Map<String, String>.from(jsonDecode(habitsStr));
       });
     }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timeStr = prefs.getString('notification_time');
+    setState(() {
+      _notificationsEnabled =
+          prefs.getBool('notifications_enabled') ?? false;
+      _selectedTasks =
+          prefs.getStringList('notification_tasks')?.toSet() ?? {};
+      if (timeStr != null) {
+        final parts = timeStr.split(':');
+        _selectedTime = TimeOfDay(
+            hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', _notificationsEnabled);
+    await prefs.setStringList('notification_tasks', _selectedTasks.toList());
+    if (_selectedTime != null) {
+      final timeStr =
+          '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+              ;
+      await prefs.setString('notification_time', timeStr);
+    } else {
+      await prefs.remove('notification_time');
+    }
+  }
+
+  Future<void> _updateScheduledNotifications() async {
+    await _flutterLocalNotificationsPlugin.cancelAll();
+    if (!_notificationsEnabled || _selectedTime == null ||
+        _selectedTasks.isEmpty) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'habit_channel',
+      'Habit Reminders',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    const details = NotificationDetails(android: androidDetails);
+    final schedule = _nextInstanceOfTime(_selectedTime!);
+
+    for (final habit in _selectedTasks) {
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        habit.hashCode,
+        'Reminder',
+        'Time to work on $habit',
+        schedule,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+  }
+
+  tz.TZDateTime _nextInstanceOfTime(TimeOfDay time) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+        tz.local, now.year, now.month, now.day, time.hour, time.minute);
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
   }
 
   Future<void> _showTestNotification() async {
@@ -66,6 +150,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _selectedTime = picked;
       });
+      await _saveSettings();
+      await _updateScheduledNotifications();
     }
   }
 
@@ -84,10 +170,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             SwitchListTile(
               title: const Text('Enable Notifications'),
               value: _notificationsEnabled,
-              onChanged: (val) {
+              onChanged: (val) async {
                 setState(() {
                   _notificationsEnabled = val;
                 });
+                await _saveSettings();
+                await _updateScheduledNotifications();
               },
             ),
             const SizedBox(height: 20),
@@ -101,7 +189,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   return CheckboxListTile(
                     title: Text(habit),
                     value: _selectedTasks.contains(habit),
-                    onChanged: (checked) {
+                    onChanged: (checked) async {
                       setState(() {
                         if (checked ?? false) {
                           _selectedTasks.add(habit);
@@ -109,6 +197,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           _selectedTasks.remove(habit);
                         }
                       });
+                      await _saveSettings();
+                      await _updateScheduledNotifications();
                     },
                   );
                 }).toList(),
