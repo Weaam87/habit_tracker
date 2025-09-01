@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'personal_info_screen.dart';
 import 'reports_screen.dart';
+import 'notifications_screen.dart';
 
 class HabitTrackerScreen extends StatefulWidget {
   final String username;
@@ -307,10 +308,12 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
           ListTile(
             leading: const Icon(Icons.notifications),
             title: const Text('Notifications'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications clicked')),
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen()),
               );
             },
           ),
