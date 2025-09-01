@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'add_habit_screen.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'personal_info_screen.dart';
+import 'reports_screen.dart';
 
 class HabitTrackerScreen extends StatefulWidget {
   final String username;
@@ -280,11 +282,14 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
           ListTile(
             leading: const Icon(Icons.person),
             title: const Text('Personal Info'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Personal Info clicked')),
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const PersonalInfoScreen()),
               );
+              _loadUser();
             },
           ),
           ListTile(
@@ -292,8 +297,10 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> {
             title: const Text('Reports'),
             onTap: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reports clicked')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const ReportsScreen()),
               );
             },
           ),
