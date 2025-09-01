@@ -173,8 +173,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _selectedTime = picked;
       });
       await _saveSettings();
-      await _updateScheduledNotifications();
     }
+  }
+
+  Future<void> _scheduleNotifications() async {
+    await _saveSettings();
+    await _updateScheduledNotifications();
+    if (!mounted || _selectedTime == null) return;
+    final formattedTime = _selectedTime!.format(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Notification set for $formattedTime')),
+    );
   }
 
   @override
@@ -202,7 +211,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   _notificationsEnabled = val;
                 });
                 await _saveSettings();
-                await _updateScheduledNotifications();
               },
             ),
             const SizedBox(height: 20),
@@ -225,7 +233,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         }
                       });
                       await _saveSettings();
-                      await _updateScheduledNotifications();
                     },
                   );
                 }).toList(),
@@ -239,6 +246,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     : 'Time: ${_selectedTime!.format(context)}',
               ),
               onTap: _pickTime,
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _notificationsEnabled &&
+                        _selectedTime != null &&
+                        _selectedTasks.isNotEmpty
+                    ? _scheduleNotifications
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                ),
+                child: const Text('Set Notification'),
+              ),
             ),
             const SizedBox(height: 10),
             SizedBox(
