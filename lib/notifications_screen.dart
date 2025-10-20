@@ -73,11 +73,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!notificationsEnabled) {
         await androidPlugin.requestNotificationsPermission();
       }
-      final canScheduleExact =
-          await androidPlugin.canScheduleExactAlarms() ?? true;
-      if (!canScheduleExact) {
-        await androidPlugin.requestExactAlarmsPermission();
-      }
+      await androidPlugin.requestExactAlarmsPermission();
     }
 
     tz.initializeTimeZones();
@@ -185,14 +181,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!granted) {
       return false;
     }
-    final canScheduleExact =
-        await androidPlugin.canScheduleExactAlarms() ?? true;
-    if (!canScheduleExact) {
-      final requested =
-          await androidPlugin.requestExactAlarmsPermission() ?? false;
-      if (!requested) {
-        return false;
-      }
+    final exactGranted = await androidPlugin.requestExactAlarmsPermission();
+    if (exactGranted == false) {
+      return false;
     }
     return true;
   }
