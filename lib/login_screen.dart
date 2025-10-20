@@ -58,8 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
       bool success = await authenticateUser();
       if (success) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('logged_in', true);
         String? name = prefs.getString('name');
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => HabitTrackerScreen(username: name ?? ''),
