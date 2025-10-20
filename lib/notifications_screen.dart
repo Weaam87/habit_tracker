@@ -23,6 +23,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Set<String> _selectedTasks = {};
   TimeOfDay? _selectedTime;
   bool _settingsLoaded = false;
+  bool _isScheduling = false;
+  int _scheduledCount = 0;
 
   @override
   void initState() {
@@ -34,9 +36,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _setup() async {
     await _loadSettings();
     await _initNotifications();
-    await _updateScheduledNotifications();
+    final scheduled = await _updateScheduledNotifications();
     setState(() {
       _settingsLoaded = true;
+      _scheduledCount = scheduled;
     });
   }
 
@@ -50,8 +53,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final androidPlugin =
         _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.requestNotificationsPermission();
-    await androidPlugin?.requestExactAlarmsPermission();
+    if (androidPlugin != null) {
+      const habitChannel = AndroidNotificationChannel(
+        'habit_channel',
+        'Habit Reminders',
+        description: 'Daily habit reminder notifications',
+        importance: Importance.high,
+      );
+      const testChannel = AndroidNotificationChannel(
+        'test_channel',
+        'Test Notifications',
+        description: 'One-off test notifications from the settings screen',
+        importance: Importance.high,
+      );
+      await androidPlugin.createNotificationChannel(habitChannel);
+      await androidPlugin.createNotificationChannel(testChannel);
+      final notificationsEnabled =
+          await androidPlugin.areNotificationsEnabled() ?? true;
+      if (!notificationsEnabled) {
+        await androidPlugin.requestNotificationsPermission();
+      }
+      final canScheduleExact =
+          await androidPlugin.canScheduleExactAlarms() ?? true;
+      if (!canScheduleExact) {
+        await androidPlugin.requestExactAlarmsPermission();
+      }
+    }
 
     tz.initializeTimeZones();
     final timeZoneName = await FlutterTimezone.getLocalTimezone();
@@ -97,11 +124,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  Future<void> _updateScheduledNotifications() async {
+  Future<int> _updateScheduledNotifications() async {
     await _flutterLocalNotificationsPlugin.cancelAll();
     if (!_notificationsEnabled ||
         _selectedTime == null ||
-        _selectedTasks.isEmpty) return;
+        _selectedTasks.isEmpty) {
+      return 0;
+    }
 
     const androidDetails = AndroidNotificationDetails(
       'habit_channel',
@@ -113,24 +142,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     const details = NotificationDetails(android: androidDetails);
     final schedule = _nextInstanceOfTime(_selectedTime!);
 
-    var id = 0;
+    var scheduled = 0;
     for (final habit in _selectedTasks) {
       await _flutterLocalNotificationsPlugin.zonedSchedule(
-        id++,
+        _notificationIdForHabit(habit),
         'Reminder',
         'Time to work on $habit',
         schedule,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
+        payload: habit,
       );
+      scheduled++;
     }
+    return scheduled;
   }
 
   @override
   void dispose() {
     _saveSettings();
     super.dispose();
+  }
+
+  int _notificationIdForHabit(String habit) {
+    return habit.hashCode & 0x7fffffff;
+  }
+
+  Future<bool> _ensureAndroidPermissions() async {
+    final androidPlugin =
+        _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) {
+      return true;
+    }
+    final notificationsEnabled =
+        await androidPlugin.areNotificationsEnabled() ?? true;
+    bool granted = notificationsEnabled;
+    if (!notificationsEnabled) {
+      granted = await androidPlugin.requestNotificationsPermission() ?? false;
+    }
+    if (!granted) {
+      return false;
+    }
+    final canScheduleExact =
+        await androidPlugin.canScheduleExactAlarms() ?? true;
+    if (!canScheduleExact) {
+      final requested =
+          await androidPlugin.requestExactAlarmsPermission() ?? false;
+      if (!requested) {
+        return false;
+      }
+    }
+    return true;
   }
 
   tz.TZDateTime _nextInstanceOfTime(TimeOfDay time) {
@@ -171,19 +235,75 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (picked != null) {
       setState(() {
         _selectedTime = picked;
+        _scheduledCount = 0;
       });
       await _saveSettings();
     }
   }
 
   Future<void> _scheduleNotifications() async {
-    await _saveSettings();
-    await _updateScheduledNotifications();
-    if (!mounted || _selectedTime == null) return;
-    final formattedTime = _selectedTime!.format(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Notification set for $formattedTime')),
-    );
+    if (_isScheduling) return;
+    setState(() {
+      _isScheduling = true;
+    });
+    try {
+      await _saveSettings();
+      if (!_notificationsEnabled ||
+          _selectedTime == null ||
+          _selectedTasks.isEmpty) {
+        await _flutterLocalNotificationsPlugin.cancelAll();
+        if (!mounted) return;
+        setState(() {
+          _scheduledCount = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Select at least one task and a time while notifications are enabled.',
+            ),
+          ),
+        );
+        return;
+      }
+      final permissionsGranted = await _ensureAndroidPermissions();
+      if (!permissionsGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Enable notifications and alarm permissions in system settings to schedule reminders.',
+            ),
+          ),
+        );
+        return;
+      }
+      final scheduled = await _updateScheduledNotifications();
+      if (!mounted) return;
+      setState(() {
+        _scheduledCount = scheduled;
+      });
+      final formattedTime = _selectedTime!.format(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Scheduled $scheduled reminder${scheduled == 1 ? '' : 's'} for $formattedTime',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to schedule notifications: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScheduling = false;
+        });
+      }
+    }
   }
 
   @override
@@ -209,8 +329,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onChanged: (val) async {
                 setState(() {
                   _notificationsEnabled = val;
+                  if (!val) {
+                    _scheduledCount = 0;
+                  }
                 });
                 await _saveSettings();
+                if (!val) {
+                  await _flutterLocalNotificationsPlugin.cancelAll();
+                }
               },
             ),
             const SizedBox(height: 20),
@@ -231,6 +357,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         } else {
                           _selectedTasks.remove(habit);
                         }
+                        _scheduledCount = 0;
                       });
                       await _saveSettings();
                     },
@@ -248,18 +375,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onTap: _pickTime,
             ),
             const SizedBox(height: 10),
+            if (_scheduledCount > 0 &&
+                _notificationsEnabled &&
+                _selectedTime != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  'Currently scheduled $_scheduledCount reminder${_scheduledCount == 1 ? '' : 's'} for ${_selectedTime!.format(context)}.',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _notificationsEnabled &&
                         _selectedTime != null &&
-                        _selectedTasks.isNotEmpty
+                        _selectedTasks.isNotEmpty &&
+                        !_isScheduling
                     ? _scheduleNotifications
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue.shade700,
                 ),
-                child: const Text('Set Notification'),
+                child: _isScheduling
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Set Notification'),
               ),
             ),
             const SizedBox(height: 10),
