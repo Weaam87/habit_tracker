@@ -15,7 +15,7 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   final bool loggedIn;
   final String username;
-  const MyApp({super.key, required this.loggedIn, required this.username});
+  const MyApp({super.key, this.loggedIn = false, this.username = ''});
 
   @override
   Widget build(BuildContext context) {
